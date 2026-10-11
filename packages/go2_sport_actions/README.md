@@ -4,6 +4,13 @@
 包名保持 `robonix.skill.unitree.go2.sport_actions`，版本 **0.2.0**。
 网站保留同一个包入口，不拆成七个代码仓库。
 
+网站使用 `package_manifest.catalog.yaml` 索引七项公开技能，每项列出
+driver（生命周期）、execute（执行）、status（状态）和 cancel（取消）四类接口。
+`package_manifest.yaml` 仍是生成绑定所需的完整清单，含共享后台 Service
+及旧版 `go2_sport_actions` 兼容接口；这些不是额外的公开动作技能。
+目录索引文件只供网站使用，实际部署使用下文的七实例配置及各动作 manifest。
+本次目录整理不修改动作代码、SDK 命令、时序或语音部署。
+
 ## 七个技能
 
 | Skill / 初始化 action | 对应宇树 Go2 动作 | 示例说法 |
