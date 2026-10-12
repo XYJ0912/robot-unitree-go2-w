@@ -1,0 +1,31 @@
+manifestVersion: 1
+name: robonix-go2w-readonly-commissioning
+
+env:
+  GO2_ALLOW_MOTION: "false"
+  ROBONIX_PROVIDER_BIND_HOST: 127.0.0.1
+  ROBONIX_ADVERTISE_HOST: 127.0.0.1
+
+system:
+  atlas: {listen: 127.0.0.1:55051, log: info}
+  executor: {listen: 127.0.0.1:55061, log: info}
+  soma:
+    listen: 127.0.0.1:55091
+    robot_yaml: soma.yaml
+    log: info
+
+primitive:
+  - name: go2w_camera_snapshot
+    path: ./packages/go2w_camera_snapshot
+    config:
+      network_interface: enp131s0
+      capture_bin: ${ROBONIX_DEPLOY_DIR}/build/go2w_camera_probe
+
+  - name: go2w_health_mock
+    path: ../../../robonix/examples/go2w_readonly
+    config:
+      source: mock
+      snapshot_path: samples/health_snapshot.mock.json
+      max_age_ms: 2000
+      metadata_path: rbnx-build/run/health-metadata.json
+      interval_s: 0.5

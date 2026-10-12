@@ -1,0 +1,25 @@
+{
+  "export_note": "Saved original-host evidence. Paths are placeholders, not recipient commands. No new robot acceptance implied.",
+  "original_record": {
+    "passed": true,
+    "version": "62057c69 + local lifecycle patch",
+    "two_round_main_acceptance": true,
+    "main_source_applied": true,
+    "main_entry_running_patched_binary_proven": true,
+    "real_active": true,
+    "both_task_chains": true,
+    "real_driver_shutdown_twice": true,
+    "restart_verified": true,
+    "all_services_stopped": true,
+    "historical_main_log_session_files_unchanged": 52,
+    "other_five_binaries_unchanged": {
+      "rbnx": "3836ff9a709bedd6f0893debdeae3a36c6e20e914c9f77e5c760597d91491b32",
+      "robonix-pilot": "ab973f8ad3227dc921758d8fccfba1035c7225afe67e35694111b4c15ef41b75",
+      "robonix-liaison": "1853534cb0f46c259e740081c17a577554c377cce264229b16fc7ba710ac2a30",
+      "robonix-atlas": "2d27864d026022b92b6d3df3406e03b31239c7596ff18168b73e943bf396674d",
+      "robonix-codegen": "8e6959d9a3c7b4baf4164de08457d0b6fef97c6bfb35c5d4871efcd5ff1ceb99"
+    },
+    "sdk_entry_unchanged_main_source": true,
+    "backup_manifest_verified": true
+  }
+}

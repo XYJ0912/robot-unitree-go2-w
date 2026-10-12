@@ -1,0 +1,15 @@
+manifestVersion: 1
+
+package:
+  name: robonix.primitive.unitree.go2w.camera_snapshot
+  version: 0.1.0
+  description: On-demand read-only Go2W RGB camera snapshot on the workstation.
+  license: Apache-2.0 AND BSD-3-Clause
+  tags: [primitive, unitree, go2w, camera, read-only]
+
+build: bash scripts/build.sh
+start: bash scripts/start.sh
+
+capabilities:
+  - name: robonix/primitive/camera/snapshot
+  - name: robonix/lifecycle/driver

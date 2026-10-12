@@ -1,0 +1,46 @@
+{
+  "base_commit": "62057c696cb49f01f14d9a4f16c9685e59b9e79b",
+  "upstream": "https://github.com/syswonder/robonix",
+  "version": "62057c69 + local Executor lifecycle patch",
+  "snapshot_date": "2026-10-12",
+  "patch_applied_to_bundled_source": true,
+  "git_metadata_included": false,
+  "binary_or_runtime_cache_included": false,
+  "submodule_git_metadata_included": false,
+  "submodules": {
+    "capabilities/lib/common_interfaces": "0ecd0f70791fe200f057b12bfc626beb21bad639",
+    "capabilities/lib/rcl_interfaces": "5afc90af2e217f83813935130bdfe74f46aa96bb",
+    "capabilities/lib/unique_identifier_msgs": "27767cefcf8a80da44641dc208c57722c28aa11c",
+    "docs": "4af6d82762af04b6784bcc4edff5210a5ef634cc"
+  },
+  "modified_files": [
+    "system/executor/README.md",
+    "system/executor/src/main.rs",
+    "system/executor/src/service.rs",
+    "system/executor/src/plan_runtime.rs",
+    "system/executor/src/lifecycle.rs"
+  ],
+  "source_export": {
+    "main": {
+      "files": 1028,
+      "materialized_symlinks": 1
+    },
+    "capabilities/lib/common_interfaces": {
+      "files": 220,
+      "materialized_symlinks": 0
+    },
+    "capabilities/lib/rcl_interfaces": {
+      "files": 91,
+      "materialized_symlinks": 0
+    },
+    "capabilities/lib/unique_identifier_msgs": {
+      "files": 9,
+      "materialized_symlinks": 0
+    },
+    "docs": {
+      "files": 222,
+      "materialized_symlinks": 0
+    }
+  },
+  "scope": "Robonix core and existing contracts; GO2-W hardware adapter not included or validated"
+}

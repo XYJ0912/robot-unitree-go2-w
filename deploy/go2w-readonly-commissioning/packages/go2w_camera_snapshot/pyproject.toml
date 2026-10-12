@@ -1,0 +1,12 @@
+[project]
+name = "robonix-go2w-camera-snapshot"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = ["pillow>=10,<13"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["go2w_camera_snapshot*"]

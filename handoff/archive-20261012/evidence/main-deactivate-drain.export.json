@@ -1,0 +1,100 @@
+{
+  "export_note": "Saved original-host evidence. Paths are placeholders, not recipient commands. No new robot acceptance implied.",
+  "original_record": {
+    "driver_result": {
+      "ok": true,
+      "state": "inactive"
+    },
+    "events": [
+      {
+        "plan_started": {
+          "plan_id": "main-deactivate-drain-4ac4228f1e9f4a35b63ee1e36ad2ae6e"
+        }
+      },
+      {
+        "event_kind": 1,
+        "node_state": {
+          "plan_id": "main-deactivate-drain-4ac4228f1e9f4a35b63ee1e36ad2ae6e",
+          "node_kind": 2,
+          "state": 4,
+          "leaf_result": {
+            "call_id": "main-deactivate-drain-4ac4228f1e9f4a35b63ee1e36ad2ae6e-call",
+            "provider_id": "mock_speech",
+            "contract_id": "robonix/service/speech/speak",
+            "success": true,
+            "output": "{\n  \"ok\": true,\n  \"detail\": \"simulated receipt=2 sha256=1553797ab1339d9bd445d834357da8fbe3aa4a18c8b3e0386a04af0a716d2841\"\n}"
+          },
+          "op_id": "one",
+          "description": "local speech receipt"
+        }
+      },
+      {
+        "event_kind": 2,
+        "plan_complete": {
+          "plan_id": "main-deactivate-drain-4ac4228f1e9f4a35b63ee1e36ad2ae6e",
+          "any_failed": true
+        }
+      }
+    ],
+    "new_submissions_rejected": [
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      },
+      {
+        "code": "FAILED_PRECONDITION",
+        "detail": "Executor is not accepting plans"
+      }
+    ],
+    "independent_receipt": {
+      "sequence": 2,
+      "timestamp_ns": 1791770433436027163,
+      "target": "sim-speaker",
+      "text": "lifecycle-block:main-deactivate-drain-4ac4228f1e9f4a35b63ee1e36ad2ae6e",
+      "sha256": "1553797ab1339d9bd445d834357da8fbe3aa4a18c8b3e0386a04af0a716d2841",
+      "simulated": true,
+      "audio_played": false
+    },
+    "main_entry_stop": false
+  }
+}

@@ -1,0 +1,774 @@
+diff --git a/system/executor/README.md b/system/executor/README.md
+index 0e19abf..1968079 100644
+--- a/system/executor/README.md
++++ b/system/executor/README.md
+@@ -53,6 +53,29 @@ startup. `verifier_args` must be a JSON/YAML object and is forwarded unchanged
+ inside the verifier request. `overlap` applies to the entire verification
+ configuration and defaults to `false`, preserving synchronous verification.
+ 
++## Lifecycle
++
++Executor serves the shared `robonix/lifecycle/driver` on its gRPC endpoint.
++After the endpoint is callable, startup invokes INIT and ACTIVATE through that
++Driver, publishing REGISTERED → INACTIVE → ACTIVE. Startup errors terminate
++the process. Execute accepts new plans only after activation; health, status,
++plan cancellation, and Driver remain callable while inactive.
++
++DEACTIVATE and SHUTDOWN close admission before cancelling all active plans.
++Unstarted nodes are skipped, asynchronous capabilities receive their cancel
++request, and synchronous calls already running may return naturally. Descendant
++tasks and verification finish before the final plan event is queued and the
++plan leaves the active table. Drain has a five-second budget. If work or cleanup
++does not finish, Driver returns `ok=false`, keeps admission closed, and does not
++publish INACTIVE or TERMINATED. Retry after completing or cancelling the work.
++ACTIVATE cannot reopen admission while a failed drain still owns work.
++
++SHUTDOWN publishes TERMINATED only after cleanup, stops heartbeat and the gRPC
++server, and exits the process. Server shutdown has a five-second grace period;
++exceeding it produces an error exit. Repeated commands for the same valid state
++are safe. INIT in ACTIVE and activation before INIT are rejected without
++cancelling existing plans. Duplicate active plan ids are rejected.
++
+ ## RTDL Execution
+ 
+ Executor interprets `Plan.nodes` from `Plan.root_index`:
+diff --git a/system/executor/src/main.rs b/system/executor/src/main.rs
+index a94c7d8..a3b54e7 100644
+--- a/system/executor/src/main.rs
++++ b/system/executor/src/main.rs
+@@ -14,6 +14,7 @@
+ 
+ mod config;
+ mod dispatch;
++mod lifecycle;
+ mod pb;
+ mod plan_runtime;
+ mod rtdl_wire;
+@@ -24,11 +25,15 @@ use anyhow::{Context, Result};
+ use clap::Parser;
+ use config::{Args, EXECUTOR_NAMESPACE, ExecutorConfig};
+ use dispatch::builtin::BUILTINS;
++use lifecycle::{CMD_ACTIVATE, CMD_INIT, SHARED_DRIVER_CONTRACT, wait_for_driver_shutdown};
++use pb::contracts::robonix_lifecycle_driver_client::RobonixLifecycleDriverClient;
++use pb::contracts::robonix_lifecycle_driver_server::RobonixLifecycleDriverServer;
+ use pb::contracts::robonix_system_executor_cancel_all_plans_server::RobonixSystemExecutorCancelAllPlansServer;
+ use pb::contracts::robonix_system_executor_control_plan_server::RobonixSystemExecutorControlPlanServer;
+ use pb::contracts::robonix_system_executor_execute_server::RobonixSystemExecutorExecuteServer;
+ use pb::contracts::robonix_system_executor_get_health_server::RobonixSystemExecutorGetHealthServer;
+ use pb::contracts::robonix_system_executor_list_active_plans_server::RobonixSystemExecutorListActivePlansServer;
++use pb::lifecycle::DriverRequest;
+ use robonix_atlas::client::{self as atlas_client, AtlasClient};
+ use robonix_atlas::pb as atlas_pb;
+ use robonix_scribe::{info, warn};
+@@ -65,6 +70,9 @@ async fn main() -> Result<()> {
+         std::net::IpAddr::V4(ip) if ip.is_unspecified() => {
+             format!("127.0.0.1:{}", listen_addr.port())
+         }
++        std::net::IpAddr::V6(ip) if ip.is_unspecified() => {
++            format!("[::1]:{}", listen_addr.port())
++        }
+         _ => listen_addr.to_string(),
+     };
+ 
+@@ -169,32 +177,20 @@ async fn main() -> Result<()> {
+         BUILTINS.len()
+     );
+ 
+-    // Executor has no Driver lifecycle handshake — it's ready as soon as
+-    // the gRPC server is up. Push ACTIVE so `rbnx caps` doesn't show the
+-    // legacy-fallback INACTIVE forever.
+-    if let Err(e) = atlas
+-        .set_lifecycle_state(&cfg.id, atlas_pb::LifecycleState::StateActive, "")
++    atlas
++        .declare_capability(
++            &cfg.id,
++            SHARED_DRIVER_CONTRACT,
++            atlas_pb::Transport::Grpc,
++            &advertised,
++            atlas_client::grpc_params(
++                "capabilities/lifecycle/driver.v1.toml",
++                "robonix.contracts.RobonixLifecycleDriver",
++                "/robonix.contracts.RobonixLifecycleDriver/Driver",
++            ),
++        )
+         .await
+-    {
+-        warn!("SetLifecycleState(ACTIVE) failed: {e:#}");
+-    }
+-
+-    // Atlas evicts providers after ~60s without a heartbeat. Send one every
+-    // 20s so we stay registered for the lifetime of the process.
+-    {
+-        let mut hb = atlas.clone();
+-        let provider_id = cfg.id.clone();
+-        tokio::spawn(async move {
+-            let mut tick = tokio::time::interval(Duration::from_secs(20));
+-            tick.tick().await;
+-            loop {
+-                tick.tick().await;
+-                if let Err(e) = hb.heartbeat(&provider_id).await {
+-                    warn!("heartbeat failed: {e:#}");
+-                }
+-            }
+-        });
+-    }
++        .context("declare Executor shared lifecycle Driver")?;
+ 
+     let verification = Arc::new(verification::VerificationPolicy::new(
+         cfg.verification.overlap,
+@@ -204,19 +200,103 @@ async fn main() -> Result<()> {
+         "loaded {} executor verification rule(s)",
+         verification.len()
+     );
+-    let svc = ExecutorServiceImpl::new(atlas, cfg.id.clone(), verification);
+-    info!("executor gRPC on {listen_addr}");
++    let svc = ExecutorServiceImpl::new(atlas.clone(), cfg.id.clone(), verification);
++    let lifecycle = svc.gate();
++    let server_shutdown = lifecycle.subscribe_shutdown();
++    let mut server_task = tokio::spawn(async move {
++        tonic::transport::Server::builder()
++            .add_service(RobonixLifecycleDriverServer::new(svc.gate()))
++            .add_service(RobonixSystemExecutorExecuteServer::new(svc.clone()))
++            .add_service(RobonixSystemExecutorCancelAllPlansServer::new(svc.clone()))
++            .add_service(RobonixSystemExecutorControlPlanServer::new(svc.clone()))
++            .add_service(RobonixSystemExecutorListActivePlansServer::new(svc.clone()))
++            .add_service(RobonixSystemExecutorGetHealthServer::new(svc))
++            .serve_with_shutdown(listen_addr, wait_for_driver_shutdown(server_shutdown))
++            .await
++    });
++    let startup = tokio::select! {
++        result = initialize_driver(&advertised) => result,
++        result = &mut server_task => {
++            result.context("join Executor server before readiness")?
++                .context("Executor server failed before readiness")?;
++            anyhow::bail!("Executor server stopped before readiness");
++        }
++    };
++    if let Err(error) = startup {
++        server_task.abort();
++        let _ = server_task.await;
++        return Err(error).context("initialize Executor lifecycle");
++    }
+     info!("robonix-executor ready on {listen_addr}");
+ 
+-    tonic::transport::Server::builder()
+-        .add_service(RobonixSystemExecutorExecuteServer::new(svc.clone()))
+-        .add_service(RobonixSystemExecutorCancelAllPlansServer::new(svc.clone()))
+-        .add_service(RobonixSystemExecutorControlPlanServer::new(svc.clone()))
+-        .add_service(RobonixSystemExecutorListActivePlansServer::new(svc.clone()))
+-        .add_service(RobonixSystemExecutorGetHealthServer::new(svc))
+-        .serve(listen_addr)
+-        .await
+-        .context("executor gRPC server failed")?;
++    let mut hb = atlas.clone();
++    let provider_id = cfg.id.clone();
++    let heartbeat_shutdown = lifecycle.subscribe_shutdown();
++    let heartbeat = tokio::spawn(async move {
++        tokio::select! {
++            _ = wait_for_driver_shutdown(heartbeat_shutdown) => {},
++            _ = async {
++                let mut tick = tokio::time::interval(Duration::from_secs(20));
++                tick.tick().await;
++                loop {
++                    tick.tick().await;
++                    if let Err(error) = hb.heartbeat(&provider_id).await {
++                        warn!("heartbeat failed: {error:#}");
++                    }
++                }
++            } => {},
++        }
++    });
++    let result = tokio::select! {
++        result = &mut server_task => result.context("join Executor server")?
++            .context("Executor gRPC server failed"),
++        _ = wait_for_driver_shutdown(lifecycle.subscribe_shutdown()) => {
++            match tokio::time::timeout(Duration::from_secs(5), &mut server_task).await {
++                Ok(result) => result.context("join Executor server")?
++                    .context("Executor gRPC server failed"),
++                Err(_) => {
++                    server_task.abort();
++                    let _ = server_task.await;
++                    Err(anyhow::anyhow!("Executor server shutdown timed out"))
++                }
++            }
++        }
++    };
++    heartbeat.abort();
++    let _ = heartbeat.await;
++    result
++}
+ 
++async fn initialize_driver(advertised: &str) -> Result<()> {
++    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
++    let mut client = loop {
++        match tokio::time::timeout_at(
++            deadline,
++            RobonixLifecycleDriverClient::connect(format!("http://{advertised}")),
++        )
++        .await
++        {
++            Ok(Ok(client)) => break client,
++            Ok(Err(_)) if tokio::time::Instant::now() < deadline => {
++                tokio::time::sleep(Duration::from_millis(25)).await;
++            }
++            _ => anyhow::bail!("connect startup lifecycle Driver timed out"),
++        }
++    };
++    for command in [CMD_INIT, CMD_ACTIVATE] {
++        let mut request = tonic::Request::new(DriverRequest {
++            command,
++            config_json: "{}".into(),
++        });
++        request.set_timeout(Duration::from_secs(12));
++        let response = client
++            .driver(request)
++            .await
++            .context("call startup lifecycle Driver")?
++            .into_inner();
++        if !response.ok {
++            anyhow::bail!("startup lifecycle Driver failed: {}", response.error);
++        }
++    }
+     Ok(())
+ }
+diff --git a/system/executor/src/plan_runtime.rs b/system/executor/src/plan_runtime.rs
+index f223ddc..c49b142 100644
+--- a/system/executor/src/plan_runtime.rs
++++ b/system/executor/src/plan_runtime.rs
+@@ -17,6 +17,7 @@ const DEFAULT_CANCEL_WAIT_MS: u64 = 5_000;
+ #[derive(Clone, Default)]
+ pub struct PlanRuntime {
+     inner: Arc<Mutex<HashMap<String, PlanRun>>>,
++    pending_lifecycle_cancels: Arc<Mutex<Vec<RunningAsyncCall>>>,
+ }
+ 
+ #[derive(Clone)]
+@@ -104,10 +105,12 @@ struct StopPlanAtArgs {
+ impl PlanRuntime {
+     /// Register a plan before execution starts.
+     ///
+-    /// If a stale entry with the same id exists it is replaced. Plan ids are
+-    /// UUIDs generated by Pilot, so replacement is only a defensive cleanup path.
+-    pub async fn register_plan(&self, plan_id: &str) {
++    /// Duplicate active ids must not replace cancellation or async-call ownership.
++    pub async fn register_plan(&self, plan_id: &str) -> bool {
+         let mut plans = self.inner.lock().await;
++        if plans.contains_key(plan_id) {
++            return false;
++        }
+         plans.insert(
+             plan_id.to_string(),
+             PlanRun {
+@@ -119,6 +122,11 @@ impl PlanRuntime {
+                 op_state: HashMap::new(),
+             },
+         );
++        true
++    }
++
++    pub async fn is_empty(&self) -> bool {
++        self.inner.lock().await.is_empty() && self.pending_lifecycle_cancels.lock().await.is_empty()
+     }
+ 
+     /// Snapshot a plan's op list (arena order) so `get_plan_status` can report
+@@ -304,7 +312,13 @@ impl PlanRuntime {
+         };
+ 
+         if let Some(call) = cancelled_call {
+-            let _ = cancel_async_call(self_provider_id, &call, atlas).await;
++            if let Err(error) = cancel_async_call(self_provider_id, &call, atlas).await {
++                warn!(
++                    "[executor] late async cancel failed for {}: {error:#}",
++                    call.call_id
++                );
++                self.pending_lifecycle_cancels.lock().await.push(call);
++            }
+             false
+         } else {
+             true
+@@ -538,6 +552,52 @@ impl PlanRuntime {
+         completed
+     }
+ 
++    pub async fn drain_for_lifecycle(
++        &self,
++        self_provider_id: &str,
++        atlas: &mut AtlasClient,
++    ) -> anyhow::Result<()> {
++        let deadline = tokio::time::Instant::now() + Duration::from_millis(DEFAULT_CANCEL_WAIT_MS);
++        let snapshot = self.begin_cancel_all(None).await;
++        let mut pending = std::mem::take(&mut *self.pending_lifecycle_cancels.lock().await);
++        pending.extend(snapshot.async_calls);
++        let mut errors = Vec::new();
++        while let Some(running) = pending.pop() {
++            if tokio::time::Instant::now() >= deadline {
++                pending.push(running);
++                errors.push("async cancellation budget exhausted".to_string());
++                break;
++            }
++            let call_deadline = deadline.min(tokio::time::Instant::now() + Duration::from_secs(2));
++            if let Err(error) =
++                cancel_async_call_until(self_provider_id, &running, atlas, call_deadline).await
++            {
++                errors.push(format!("{}: {error:#}", running.call_id));
++                self.pending_lifecycle_cancels.lock().await.push(running);
++            }
++        }
++        self.pending_lifecycle_cancels.lock().await.extend(pending);
++        let wait_ms = deadline
++            .saturating_duration_since(tokio::time::Instant::now())
++            .as_millis() as u64;
++        if !self
++            .wait_until_all_inactive(&snapshot.plan_ids, wait_ms)
++            .await
++        {
++            errors.push("plans did not finish within the drain budget".into());
++        }
++        if !self.pending_lifecycle_cancels.lock().await.is_empty() && errors.is_empty() {
++            errors.push("async cancellation cleanup is still pending".into());
++        }
++        if !errors.is_empty() {
++            anyhow::bail!(
++                "Executor drain failed; admission remains closed: {}",
++                errors.join("; ")
++            );
++        }
++        Ok(())
++    }
++
+     /// Cancel every active plan except an optional control plan and wait for
+     /// the targets to leave the active table.
+     pub async fn cancel_all_plans_except(
+@@ -667,6 +727,48 @@ async fn cancel_async_call(
+     }
+ }
+ 
++async fn cancel_async_call_until(
++    consumer_id: &str,
++    running: &RunningAsyncCall,
++    atlas: &mut AtlasClient,
++    deadline: tokio::time::Instant,
++) -> anyhow::Result<()> {
++    let args_json = if running.run_id.is_empty() {
++        "{}".into()
++    } else {
++        serde_json::json!({"run_id": running.run_id}).to_string()
++    };
++    let call = CapabilityCall {
++        call_id: format!("cancel-{}", uuid::Uuid::new_v4()),
++        provider_id: running.provider_id.clone(),
++        contract_id: running.cancel_contract.clone(),
++        args_json,
++    };
++    // Reserve time to release the Atlas channel even when the provider stalls.
++    let request_deadline = deadline - Duration::from_millis(200);
++    let (channel_id, endpoint, _) = tokio::time::timeout_at(
++        request_deadline,
++        atlas.connect_capability(
++            consumer_id,
++            &running.provider_id,
++            &running.cancel_contract,
++            atlas_pb::Transport::Mcp,
++        ),
++    )
++    .await??;
++    let result = tokio::time::timeout_at(
++        request_deadline,
++        crate::dispatch::mcp::execute(&call, &endpoint),
++    )
++    .await;
++    tokio::time::timeout_at(deadline, atlas.disconnect_capability(&channel_id)).await??;
++    let result = result?;
++    if !result.success {
++        anyhow::bail!("{}", result.error);
++    }
++    Ok(())
++}
++
+ /// Build a failed capability result for a builtin.
+ fn error_result(call: &CapabilityCall, error: String) -> CapabilityCallResult {
+     CapabilityCallResult {
+diff --git a/system/executor/src/service.rs b/system/executor/src/service.rs
+index 0505f62..8896923 100644
+--- a/system/executor/src/service.rs
++++ b/system/executor/src/service.rs
+@@ -4,6 +4,7 @@
+ // gRPC contract handlers for executor plan execution and cancellation.
+ 
+ use crate::dispatch::{async_poll, async_registry};
++use crate::lifecycle::LifecycleGate;
+ use crate::pb::contracts::robonix_system_executor_cancel_all_plans_server::RobonixSystemExecutorCancelAllPlans;
+ use crate::pb::contracts::robonix_system_executor_control_plan_server::RobonixSystemExecutorControlPlan;
+ use crate::pb::contracts::robonix_system_executor_execute_server::RobonixSystemExecutorExecute;
+@@ -137,6 +138,7 @@ pub struct ExecutorServiceImpl {
+     provider_id: String,
+     runtime: PlanRuntime,
+     verification: Arc<VerificationPolicy>,
++    gate: LifecycleGate,
+ }
+ 
+ impl ExecutorServiceImpl {
+@@ -145,13 +147,20 @@ impl ExecutorServiceImpl {
+         provider_id: String,
+         verification: Arc<VerificationPolicy>,
+     ) -> Self {
++        let runtime = PlanRuntime::default();
++        let gate = LifecycleGate::new(atlas.clone(), provider_id.clone(), runtime.clone());
+         Self {
+             atlas,
+             provider_id,
+-            runtime: PlanRuntime::default(),
++            runtime,
+             verification,
++            gate,
+         }
+     }
++
++    pub fn gate(&self) -> LifecycleGate {
++        self.gate.clone()
++    }
+ }
+ 
+ #[tonic::async_trait]
+@@ -164,6 +173,7 @@ impl RobonixSystemExecutorExecute for ExecutorServiceImpl {
+     ) -> Result<Response<Self::ExecuteStream>, Status> {
+         let plan = request.into_inner();
+         validate_plan(&plan).map_err(Status::invalid_argument)?;
++        self.gate.admit_plan(&plan).await?;
+         let (tx, rx) = tokio::sync::mpsc::channel(64);
+         let atlas = self.atlas.clone();
+         let provider_id = self.provider_id.clone();
+@@ -173,8 +183,6 @@ impl RobonixSystemExecutorExecute for ExecutorServiceImpl {
+         tokio::spawn(async move {
+             let plan_id = plan.plan_id.clone();
+             let plan = Arc::new(plan);
+-            runtime.register_plan(&plan_id).await;
+-            runtime.record_plan_ops(&plan).await;
+             let _ = tx.send(Ok(rtdl_wire::plan_started(plan_id.clone()))).await;
+             let execution = execute_node(
+                 Arc::clone(&plan),
+@@ -188,14 +196,14 @@ impl RobonixSystemExecutorExecute for ExecutorServiceImpl {
+             .await;
+             let verification_failed = wait_for_verifiers(execution.verifiers).await;
+             let cancelled = runtime.is_cancelled(&plan_id).await;
+-            runtime.complete_plan(&plan_id).await;
+ 
+             let _ = tx
+                 .send(Ok(rtdl_wire::plan_complete(
+-                    plan_id,
++                    plan_id.clone(),
+                     execution.failed || verification_failed || cancelled,
+                 )))
+                 .await;
++            runtime.complete_plan(&plan_id).await;
+         });
+ 
+         Ok(Response::new(ReceiverStream::new(rx)))
+@@ -1209,13 +1217,31 @@ mod tests {
+         let atlas_addr = reserve_address();
+         let atlas_server =
+             tokio::spawn(serve_atlas(Arc::new(AtlasRegistry::default()), atlas_addr));
+-        let atlas = AtlasClient::connect_with_retry(
++        let mut atlas = AtlasClient::connect_with_retry(
+             format!("http://{atlas_addr}"),
+             50,
+             Duration::from_millis(10),
+         )
+         .await
+         .expect("connect test Atlas");
++        atlas
++            .register_service("executor", "robonix/system/executor", "")
++            .await
++            .unwrap();
++        atlas
++            .declare_capability(
++                "executor",
++                crate::lifecycle::SHARED_DRIVER_CONTRACT,
++                robonix_atlas::pb::Transport::Grpc,
++                "127.0.0.1:50061",
++                robonix_atlas::client::grpc_params(
++                    "capabilities/lifecycle/driver.v1.toml",
++                    "robonix.contracts.RobonixLifecycleDriver",
++                    "/robonix.contracts.RobonixLifecycleDriver/Driver",
++                ),
++            )
++            .await
++            .unwrap();
+         let contract_id = "robonix/system/executor/builtin/get_all_plans";
+         let service = ExecutorServiceImpl::new(
+             atlas,
+@@ -1269,6 +1295,21 @@ mod tests {
+             ],
+             root_index: 0,
+         };
++        for command in [crate::lifecycle::CMD_INIT, crate::lifecycle::CMD_ACTIVATE] {
++            use crate::pb::contracts::robonix_lifecycle_driver_server::RobonixLifecycleDriver;
++            assert!(
++                service
++                    .gate()
++                    .driver(Request::new(crate::pb::lifecycle::DriverRequest {
++                        command,
++                        config_json: "{}".into(),
++                    }))
++                    .await
++                    .unwrap()
++                    .into_inner()
++                    .ok
++            );
++        }
+         let mut stream = service
+             .execute(Request::new(plan))
+             .await
+diff --git a/system/executor/src/lifecycle.rs b/system/executor/src/lifecycle.rs
+new file mode 100644
+index 0000000..b22f679
+--- /dev/null
++++ b/system/executor/src/lifecycle.rs
+@@ -0,0 +1,247 @@
++// SPDX-License-Identifier: MulanPSL-2.0
++use crate::pb::contracts::robonix_lifecycle_driver_server::RobonixLifecycleDriver;
++use crate::pb::lifecycle::{DriverRequest, DriverResponse};
++use crate::pb::pilot::Plan;
++use crate::plan_runtime::PlanRuntime;
++use anyhow::{Context, Result, bail};
++use robonix_atlas::client::AtlasClient;
++use robonix_atlas::pb::LifecycleState;
++use robonix_scribe::{info, warn};
++use std::sync::Arc;
++use std::time::Duration;
++use tokio::sync::{Mutex, watch};
++use tonic::{Request, Response, Status};
++
++pub const SHARED_DRIVER_CONTRACT: &str = "robonix/lifecycle/driver";
++pub const CMD_INIT: u32 = 0;
++pub const CMD_ACTIVATE: u32 = 1;
++pub const CMD_DEACTIVATE: u32 = 2;
++pub const CMD_SHUTDOWN: u32 = 3;
++const DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
++
++struct Admission {
++    state: LifecycleState,
++    accepting: bool,
++}
++
++#[derive(Clone)]
++pub struct LifecycleGate {
++    atlas: AtlasClient,
++    provider_id: String,
++    runtime: PlanRuntime,
++    admission: Arc<Mutex<Admission>>,
++    commands: Arc<Mutex<()>>,
++    shutdown_tx: watch::Sender<bool>,
++}
++
++impl LifecycleGate {
++    pub fn new(atlas: AtlasClient, provider_id: String, runtime: PlanRuntime) -> Self {
++        let (shutdown_tx, _) = watch::channel(false);
++        Self {
++            atlas,
++            provider_id,
++            runtime,
++            admission: Arc::new(Mutex::new(Admission {
++                state: LifecycleState::StateRegistered,
++                accepting: false,
++            })),
++            commands: Arc::new(Mutex::new(())),
++            shutdown_tx,
++        }
++    }
++
++    pub fn subscribe_shutdown(&self) -> watch::Receiver<bool> {
++        self.shutdown_tx.subscribe()
++    }
++
++    pub async fn admit_plan(&self, plan: &Plan) -> Result<(), Status> {
++        // Admission and registration must precede the drain snapshot together.
++        let admission = self.admission.lock().await;
++        if !admission.accepting {
++            return Err(Status::failed_precondition(
++                "Executor is not accepting plans",
++            ));
++        }
++        if !self.runtime.register_plan(&plan.plan_id).await {
++            return Err(Status::already_exists("RTDL plan is already active"));
++        }
++        self.runtime.record_plan_ops(plan).await;
++        Ok(())
++    }
++
++    async fn transition(&self, command: u32) -> Result<&'static str> {
++        use LifecycleState::*;
++        let _serial = self.commands.lock().await;
++        let mut admission = self.admission.lock().await;
++        let state = admission.state;
++        let (target, label) = match command {
++            CMD_INIT if matches!(state, StateRegistered | StateInactive | StateError) => {
++                (StateInactive, "inactive")
++            }
++            CMD_ACTIVATE if matches!(state, StateInactive | StateActive) => (StateActive, "active"),
++            CMD_DEACTIVATE if matches!(state, StateInactive | StateActive) => {
++                (StateInactive, "inactive")
++            }
++            CMD_SHUTDOWN => (StateTerminated, "terminated"),
++            CMD_INIT | CMD_ACTIVATE | CMD_DEACTIVATE => {
++                bail!("lifecycle command {command} is invalid in {state:?}")
++            }
++            _ => bail!("unknown lifecycle command {command}"),
++        };
++        if command == CMD_ACTIVATE && !admission.accepting && !self.runtime.is_empty().await {
++            bail!("Executor still has plans draining; retry after they finish")
++        }
++        admission.accepting = false;
++        drop(admission);
++
++        if command != CMD_ACTIVATE {
++            let mut atlas = self.atlas.clone();
++            self.runtime
++                .drain_for_lifecycle(&self.provider_id, &mut atlas)
++                .await?;
++        }
++
++        let mut atlas = self.atlas.clone();
++        tokio::time::timeout(
++            DRAIN_TIMEOUT,
++            atlas.set_lifecycle_state(&self.provider_id, target, ""),
++        )
++        .await
++        .context("publish Executor lifecycle state timed out")??;
++        let mut admission = self.admission.lock().await;
++        admission.state = target;
++        admission.accepting = command == CMD_ACTIVATE;
++        if command == CMD_SHUTDOWN {
++            self.shutdown_tx.send_replace(true);
++        }
++        info!("[executor/lifecycle] command {command} -> {label}");
++        Ok(label)
++    }
++}
++
++#[tonic::async_trait]
++impl RobonixLifecycleDriver for LifecycleGate {
++    async fn driver(
++        &self,
++        request: Request<DriverRequest>,
++    ) -> Result<Response<DriverResponse>, Status> {
++        let command = request.into_inner().command;
++        let response = match self.transition(command).await {
++            Ok(state) => DriverResponse {
++                ok: true,
++                state: state.into(),
++                error: String::new(),
++            },
++            Err(error) => {
++                warn!("[executor/lifecycle] command {command} failed: {error:#}");
++                DriverResponse {
++                    ok: false,
++                    state: "error".into(),
++                    error: format!("{error:#}"),
++                }
++            }
++        };
++        Ok(Response::new(response))
++    }
++}
++
++pub async fn wait_for_driver_shutdown(mut shutdown: watch::Receiver<bool>) {
++    if *shutdown.borrow() {
++        return;
++    }
++    while shutdown.changed().await.is_ok() {
++        if *shutdown.borrow() {
++            return;
++        }
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    use robonix_atlas::service::{AtlasRegistry, serve_atlas};
++
++    #[tokio::test]
++    async fn admission_registration_and_drain_share_the_lifecycle_boundary() {
++        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
++        let addr = listener.local_addr().unwrap();
++        drop(listener);
++        let server = tokio::spawn(serve_atlas(Arc::new(AtlasRegistry::default()), addr));
++        let mut atlas = AtlasClient::connect_with_retry(
++            format!("http://{addr}"),
++            50,
++            Duration::from_millis(10),
++        )
++        .await
++        .unwrap();
++        atlas
++            .register_service("executor", "robonix/system/executor", "")
++            .await
++            .unwrap();
++        atlas
++            .declare_capability(
++                "executor",
++                SHARED_DRIVER_CONTRACT,
++                robonix_atlas::pb::Transport::Grpc,
++                "127.0.0.1:50061",
++                robonix_atlas::client::grpc_params(
++                    "capabilities/lifecycle/driver.v1.toml",
++                    "robonix.contracts.RobonixLifecycleDriver",
++                    "/robonix.contracts.RobonixLifecycleDriver/Driver",
++                ),
++            )
++            .await
++            .unwrap();
++        let runtime = PlanRuntime::default();
++        let gate = LifecycleGate::new(atlas, "executor".into(), runtime.clone());
++        let plan = Plan {
++            plan_id: "p".into(),
++            ..Default::default()
++        };
++        assert_eq!(
++            gate.admit_plan(&plan).await.unwrap_err().code(),
++            tonic::Code::FailedPrecondition
++        );
++        assert!(gate.transition(CMD_ACTIVATE).await.is_err());
++        gate.transition(CMD_INIT).await.unwrap();
++        gate.transition(CMD_ACTIVATE).await.unwrap();
++        gate.admit_plan(&plan).await.unwrap();
++        assert_eq!(
++            gate.admit_plan(&plan).await.unwrap_err().code(),
++            tonic::Code::AlreadyExists
++        );
++        assert!(gate.transition(CMD_INIT).await.is_err());
++        assert!(!runtime.is_cancelled("p").await);
++        let draining = tokio::spawn({
++            let gate = gate.clone();
++            async move { gate.transition(CMD_DEACTIVATE).await }
++        });
++        tokio::time::timeout(Duration::from_secs(1), async {
++            while !runtime.is_cancelled("p").await {
++                tokio::task::yield_now().await;
++            }
++        })
++        .await
++        .unwrap();
++        assert!(
++            gate.admit_plan(&Plan {
++                plan_id: "late".into(),
++                ..Default::default()
++            })
++            .await
++            .is_err()
++        );
++        assert!(!draining.is_finished());
++        runtime.complete_plan("p").await;
++        assert_eq!(draining.await.unwrap().unwrap(), "inactive");
++        assert!(runtime.is_empty().await);
++        assert!(gate.transition(99).await.is_err());
++        gate.transition(CMD_DEACTIVATE).await.unwrap();
++        gate.transition(CMD_ACTIVATE).await.unwrap();
++        gate.transition(CMD_SHUTDOWN).await.unwrap();
++        gate.transition(CMD_SHUTDOWN).await.unwrap();
++        assert!(*gate.subscribe_shutdown().borrow());
++        assert!(gate.transition(CMD_ACTIVATE).await.is_err());
++        server.abort();
++    }
++}

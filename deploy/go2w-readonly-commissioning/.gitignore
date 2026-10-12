@@ -1,0 +1,9 @@
+build/
+rbnx-build/
+rbnx-boot/
+.env
+*.jsonl
+logs/
+__pycache__/
+*.pyc
+*.egg-info/

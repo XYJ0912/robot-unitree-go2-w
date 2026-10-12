@@ -1,6 +1,6 @@
 # Go2W 接入记录索引
 
-截至 2026-10-12，本目录归档开发笔记本上的 Go2W 只读接入记录。本次同步仅涉及文档；目标仓库仍以 Go2 部署代码为基线，独立 Go2W commissioning 原型留在本地交接目录，尚未作为可复现功能提交到此仓库。归档文档按形成时间保留原话，状态变化以本页和较新的审计为准。
+截至 2026-10-12，本目录归档开发笔记本上的 Go2W 只读接入记录。后续已将本地 Go2W commissioning 原型复制到 [`deploy/go2w-readonly-commissioning/`](../../deploy/go2w-readonly-commissioning/README.md)，并将交接包中 `source/` 之外的手写文档和代码归档到 [`handoff/`](../../handoff/README.md)。目标仓库的其他运行路径仍是 Go2 代码基线；Go2W 原型尚非完整可移植部署。归档文档按形成时间保留原话，状态变化以本页和较新的审计为准。
 
 ## 已真机验证（只读）
 
@@ -15,9 +15,9 @@
 
 ## 当前待验证 / WIP
 
-- 本仓库中的独立 Go2W deployment 与真实状态 provider 尚未提交。历史 mock health 注册不等于真机 health 接入。
+- 独立 Go2W commissioning 代码已复制入本仓库，但真实状态 provider 尚未完成；历史 mock health 注册不等于真机 health 接入。
 - 完整 IMU 单位/frame、odometry 原点与坐标系、TF、LiDAR topic/QoS/点云字段、相机持续流/标定/源时间均待验证。SportModeState 的设备 stamp 曾为零，不能直接用于新鲜度验收。
-- 本地相机原型曾注册 Atlas，但可复现的本仓库构建/启动/Atlas 接入尚未完成；Pilot/Executor 对真机能力的调用未验证。
+- 本地相机原型曾注册 Atlas；迁入后尚未重新完成本仓库构建/启动/Atlas 验收；Pilot/Executor 对真机能力的调用未验证。
 - 任何 Go2W 运动、StopMove/急停效果、导航均未测试且未获本记录授权。保持 `GO2_ALLOW_MOTION=false` 或等价关闭态。
 
 ## 过程资料

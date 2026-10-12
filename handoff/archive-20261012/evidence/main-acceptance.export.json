@@ -1,0 +1,430 @@
+{
+  "export_note": "Saved original-host evidence. Paths are placeholders, not recipient commands. No new robot acceptance implied.",
+  "original_record": {
+    "passed": true,
+    "actual_main_entry": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/deploy.sh",
+    "rounds": [
+      {
+        "round": 1,
+        "run": "<ORIGINAL_DEPLOYMENT_ROOT>/.main-deployment-lifecycle-fix-20261012/runs/20261012T020030-22",
+        "shutdown": {
+          "processes": [
+            {
+              "name": "liaison",
+              "pid": 169,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "stopped": true
+            },
+            {
+              "name": "pilot",
+              "pid": 138,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "stopped": true
+            },
+            {
+              "name": "executor",
+              "pid": 68,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "port_closed": true,
+              "terminal_state": "TERMINATED",
+              "last_heartbeat_ms": 1791770430745,
+              "heartbeat_stopped_21s": true,
+              "stopped": true
+            },
+            {
+              "name": "mock_speech",
+              "pid": 97,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "stopped": true
+            },
+            {
+              "name": "atlas",
+              "pid": 38,
+              "signal": "SIGTERM",
+              "stopped": true
+            },
+            {
+              "name": "fake_vlm",
+              "pid": 223,
+              "signal": "SIGTERM",
+              "stopped": true
+            }
+          ],
+          "ports_still_open": {
+            "fake_vlm": false,
+            "atlas": false,
+            "executor": false,
+            "pilot": false,
+            "liaison": false
+          },
+          "passed": true
+        },
+        "verification": {
+          "passed": true,
+          "results": [
+            {
+              "name": "mock_speech_via_liaison",
+              "session_id": "81ffc3e5-9a92-4596-afe3-ef402553c0c2",
+              "errors": [],
+              "calls": [
+                {
+                  "call_id": "eff1-1:0",
+                  "provider_id": "mock_speech",
+                  "contract_id": "robonix/service/speech/speak",
+                  "args_json": "{\"target\":\"sim-speaker\",\"text\":\"Robonix first pass ready\"}"
+                }
+              ],
+              "leaf_results": [
+                {
+                  "call_id": "eff1-1:0",
+                  "provider_id": "mock_speech",
+                  "contract_id": "robonix/service/speech/speak",
+                  "success": true,
+                  "output": "{\n  \"ok\": true,\n  \"detail\": \"simulated receipt=1 sha256=481d14bb5e16ef1f59d71eeac45409312677c309e1a87b069e4ab238c406021a\"\n}"
+                }
+              ],
+              "receipt": {
+                "sequence": 1,
+                "timestamp_ns": 1791770432842598462,
+                "target": "sim-speaker",
+                "text": "Robonix first pass ready",
+                "sha256": "481d14bb5e16ef1f59d71eeac45409312677c309e1a87b069e4ab238c406021a",
+                "simulated": true,
+                "audio_played": false
+              }
+            },
+            {
+              "name": "file_roundtrip_via_cli",
+              "exit_code": 0,
+              "errors": [],
+              "session_id": "f37acfd6-780f-4527-a282-1629f80d2f84",
+              "independent_readback": {
+                "path": "<ORIGINAL_DEPLOYMENT_ROOT>/.main-deployment-lifecycle-fix-20261012/runs/20261012T020030-22/workspace/ci_probe.txt",
+                "text": "robonix ci probe alpha-7",
+                "bytes": 24,
+                "sha256": "f9cef166fceaaceb55acf83adf8ff2a4c5e83f0b12b3160e0d70e701ab04d618"
+              },
+              "calls": [
+                {
+                  "args_json": "{\"content\":\"robonix ci probe alpha-7\",\"path\":\"ci_probe.txt\"}",
+                  "call_id": "eff1-3:0",
+                  "contract_id": "robonix/system/executor/builtin/write_file",
+                  "provider_id": "executor"
+                },
+                {
+                  "args_json": "{\"path\":\"ci_probe.txt\"}",
+                  "call_id": "eff1-3:1",
+                  "contract_id": "robonix/system/executor/builtin/read_file",
+                  "provider_id": "executor"
+                },
+                {
+                  "args_json": "{\"path\":\".\"}",
+                  "call_id": "eff1-3:2",
+                  "contract_id": "robonix/system/executor/builtin/list_dir",
+                  "provider_id": "executor"
+                }
+              ],
+              "leaf_results": [
+                {
+                  "call_id": "eff1-3:0",
+                  "contract_id": "robonix/system/executor/builtin/write_file",
+                  "error": "",
+                  "output": "wrote 24 bytes to <ORIGINAL_DEPLOYMENT_ROOT>/.main-deployment-lifecycle-fix-20261012/runs/20261012T020030-22/workspace/ci_probe.txt",
+                  "success": true
+                },
+                {
+                  "call_id": "eff1-3:1",
+                  "contract_id": "robonix/system/executor/builtin/read_file",
+                  "error": "",
+                  "output": "robonix ci probe alpha-7",
+                  "success": true
+                },
+                {
+                  "call_id": "eff1-3:2",
+                  "contract_id": "robonix/system/executor/builtin/list_dir",
+                  "error": "",
+                  "output": "file ci_probe.txt",
+                  "success": true
+                }
+              ]
+            },
+            {
+              "name": "empty_in_progress_rejected",
+              "session_id": "b21637bc-326d-4fcc-ac5d-8317d9438ade",
+              "exit_code": 0,
+              "errors": [],
+              "calls": [],
+              "leaf_results": [],
+              "task_success": false,
+              "expected_rejection": true
+            }
+          ],
+          "planning": "scripted fake VLM; no real model inference"
+        },
+        "readiness": {
+          "state": "ACTIVE",
+          "driver_contract": "robonix/lifecycle/driver",
+          "driver_provider": "executor",
+          "activation_rpc": {
+            "ok": true,
+            "state": "active"
+          },
+          "running_process": {
+            "name": "executor",
+            "pid": 68,
+            "start_time": "336",
+            "executable": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target/debug/robonix-executor",
+            "cmdline_sha256": "933f8429c8e671a34712edf097ba8a419147d5b003a3360d6180cc19ec31cea8",
+            "command": [
+              "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target/debug/robonix-executor",
+              "--atlas",
+              "127.0.0.1:25151",
+              "--listen",
+              "127.0.0.1:25161",
+              "--id",
+              "executor"
+            ]
+          },
+          "main_release": {
+            "version": "62057c69 + local lifecycle patch",
+            "source": "<ORIGINAL_DEPLOYMENT_ROOT>",
+            "target": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target",
+            "executor": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target/debug/robonix-executor",
+            "binary_sha256": "0fb44f169cfc5dd415ca24cef8fe2a911bdfc204e05775e3394376196006f26a",
+            "source_sha256": {
+              "src/main.rs": "66676159115f2a722ebfa1bcab88bd2aa2b115bfb9c7bbebdbbbeedd1e9d0a6f",
+              "src/lifecycle.rs": "ca9259ac3b8cb92fd54493a5012d19794fae619941cf3c2ccf0fb990d19f624d",
+              "src/service.rs": "8523a685487c5f29b085a446680a63fc906d678bf432cf837b93756bc0f1dcf2",
+              "src/plan_runtime.rs": "bc10a2d935bb8d5a82b86d3eb93fe06857cb661666d3e46c358118a765dda477",
+              "README.md": "840b5afc82b1c963e484d7a9045bfde986fcbafc79f6bb5980cd902bde01ecd3"
+            },
+            "cargo_lock_sha256": "d0c3887eb307bb02e20e1c907dabd91584673c179f4e111a10c7e152fa2d6a04"
+          }
+        }
+      },
+      {
+        "round": 2,
+        "run": "<ORIGINAL_DEPLOYMENT_ROOT>/.main-deployment-lifecycle-fix-20261012/runs/20261012T020056-351",
+        "shutdown": {
+          "processes": [
+            {
+              "name": "liaison",
+              "pid": 498,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "stopped": true
+            },
+            {
+              "name": "pilot",
+              "pid": 467,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "stopped": true
+            },
+            {
+              "name": "executor",
+              "pid": 397,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "port_closed": true,
+              "terminal_state": "TERMINATED",
+              "last_heartbeat_ms": 1791770456637,
+              "heartbeat_stopped_21s": true,
+              "stopped": true
+            },
+            {
+              "name": "mock_speech",
+              "pid": 426,
+              "driver_shutdown": {
+                "ok": true,
+                "state": "terminated"
+              },
+              "stopped": true
+            },
+            {
+              "name": "atlas",
+              "pid": 367,
+              "signal": "SIGTERM",
+              "stopped": true
+            },
+            {
+              "name": "fake_vlm",
+              "pid": 532,
+              "signal": "SIGTERM",
+              "stopped": true
+            }
+          ],
+          "ports_still_open": {
+            "fake_vlm": false,
+            "atlas": false,
+            "executor": false,
+            "pilot": false,
+            "liaison": false
+          },
+          "passed": true
+        },
+        "verification": {
+          "passed": true,
+          "results": [
+            {
+              "name": "mock_speech_via_liaison",
+              "session_id": "682be17d-01f2-4319-9913-f0cfcb65b7d0",
+              "errors": [],
+              "calls": [
+                {
+                  "call_id": "6083-1:0",
+                  "provider_id": "mock_speech",
+                  "contract_id": "robonix/service/speech/speak",
+                  "args_json": "{\"target\":\"sim-speaker\",\"text\":\"Robonix first pass ready\"}"
+                }
+              ],
+              "leaf_results": [
+                {
+                  "call_id": "6083-1:0",
+                  "provider_id": "mock_speech",
+                  "contract_id": "robonix/service/speech/speak",
+                  "success": true,
+                  "output": "{\n  \"ok\": true,\n  \"detail\": \"simulated receipt=1 sha256=481d14bb5e16ef1f59d71eeac45409312677c309e1a87b069e4ab238c406021a\"\n}"
+                }
+              ],
+              "receipt": {
+                "sequence": 1,
+                "timestamp_ns": 1791770458459943333,
+                "target": "sim-speaker",
+                "text": "Robonix first pass ready",
+                "sha256": "481d14bb5e16ef1f59d71eeac45409312677c309e1a87b069e4ab238c406021a",
+                "simulated": true,
+                "audio_played": false
+              }
+            },
+            {
+              "name": "file_roundtrip_via_cli",
+              "exit_code": 0,
+              "errors": [],
+              "session_id": "af32f02d-f467-47d4-9e00-37fa6bde358d",
+              "independent_readback": {
+                "path": "<ORIGINAL_DEPLOYMENT_ROOT>/.main-deployment-lifecycle-fix-20261012/runs/20261012T020056-351/workspace/ci_probe.txt",
+                "text": "robonix ci probe alpha-7",
+                "bytes": 24,
+                "sha256": "f9cef166fceaaceb55acf83adf8ff2a4c5e83f0b12b3160e0d70e701ab04d618"
+              },
+              "calls": [
+                {
+                  "args_json": "{\"content\":\"robonix ci probe alpha-7\",\"path\":\"ci_probe.txt\"}",
+                  "call_id": "6083-3:0",
+                  "contract_id": "robonix/system/executor/builtin/write_file",
+                  "provider_id": "executor"
+                },
+                {
+                  "args_json": "{\"path\":\"ci_probe.txt\"}",
+                  "call_id": "6083-3:1",
+                  "contract_id": "robonix/system/executor/builtin/read_file",
+                  "provider_id": "executor"
+                },
+                {
+                  "args_json": "{\"path\":\".\"}",
+                  "call_id": "6083-3:2",
+                  "contract_id": "robonix/system/executor/builtin/list_dir",
+                  "provider_id": "executor"
+                }
+              ],
+              "leaf_results": [
+                {
+                  "call_id": "6083-3:0",
+                  "contract_id": "robonix/system/executor/builtin/write_file",
+                  "error": "",
+                  "output": "wrote 24 bytes to <ORIGINAL_DEPLOYMENT_ROOT>/.main-deployment-lifecycle-fix-20261012/runs/20261012T020056-351/workspace/ci_probe.txt",
+                  "success": true
+                },
+                {
+                  "call_id": "6083-3:1",
+                  "contract_id": "robonix/system/executor/builtin/read_file",
+                  "error": "",
+                  "output": "robonix ci probe alpha-7",
+                  "success": true
+                },
+                {
+                  "call_id": "6083-3:2",
+                  "contract_id": "robonix/system/executor/builtin/list_dir",
+                  "error": "",
+                  "output": "file ci_probe.txt",
+                  "success": true
+                }
+              ]
+            },
+            {
+              "name": "empty_in_progress_rejected",
+              "session_id": "ec95ccec-2b6c-4436-9069-d71716ccf7d0",
+              "exit_code": 0,
+              "errors": [],
+              "calls": [],
+              "leaf_results": [],
+              "task_success": false,
+              "expected_rejection": true
+            }
+          ],
+          "planning": "scripted fake VLM; no real model inference"
+        },
+        "readiness": {
+          "state": "ACTIVE",
+          "driver_contract": "robonix/lifecycle/driver",
+          "driver_provider": "executor",
+          "activation_rpc": {
+            "ok": true,
+            "state": "active"
+          },
+          "running_process": {
+            "name": "executor",
+            "pid": 397,
+            "start_time": "2926",
+            "executable": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target/debug/robonix-executor",
+            "cmdline_sha256": "933f8429c8e671a34712edf097ba8a419147d5b003a3360d6180cc19ec31cea8",
+            "command": [
+              "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target/debug/robonix-executor",
+              "--atlas",
+              "127.0.0.1:25151",
+              "--listen",
+              "127.0.0.1:25161",
+              "--id",
+              "executor"
+            ]
+          },
+          "main_release": {
+            "version": "62057c69 + local lifecycle patch",
+            "source": "<ORIGINAL_DEPLOYMENT_ROOT>",
+            "target": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target",
+            "executor": "<ORIGINAL_DEPLOYMENT_ROOT>/.upgrade-latest-20261011/runtime/target/debug/robonix-executor",
+            "binary_sha256": "0fb44f169cfc5dd415ca24cef8fe2a911bdfc204e05775e3394376196006f26a",
+            "source_sha256": {
+              "src/main.rs": "66676159115f2a722ebfa1bcab88bd2aa2b115bfb9c7bbebdbbbeedd1e9d0a6f",
+              "src/lifecycle.rs": "ca9259ac3b8cb92fd54493a5012d19794fae619941cf3c2ccf0fb990d19f624d",
+              "src/service.rs": "8523a685487c5f29b085a446680a63fc906d678bf432cf837b93756bc0f1dcf2",
+              "src/plan_runtime.rs": "bc10a2d935bb8d5a82b86d3eb93fe06857cb661666d3e46c358118a765dda477",
+              "README.md": "840b5afc82b1c963e484d7a9045bfde986fcbafc79f6bb5980cd902bde01ecd3"
+            },
+            "cargo_lock_sha256": "d0c3887eb307bb02e20e1c907dabd91584673c179f4e111a10c7e152fa2d6a04"
+          }
+        }
+      }
+    ],
+    "scope": "loopback fake VLM + real SDK mock; no paid planning or robot"
+  }
+}

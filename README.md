@@ -2,11 +2,11 @@
 
 ## Go2W 接入状态（2026-10-12，文档同步）
 
-本仓库当前仍是 Go2 部署代码基线。以下 Go2W 结果来自开发笔记本上的独立、未发布 commissioning 实验目录；本次只同步文档，**不包含 Go2W provider 或部署代码**，不能将原有 Go2 的实机/运动验收视为 Go2W 验收。
+本仓库原有运行路径仍是 Go2 部署代码基线。以下 Go2W 结果来自开发笔记本上的独立 commissioning 实验；原型代码现已复制到 [Go2W commissioning 目录](deploy/go2w-readonly-commissioning/README.md)，交接包其余手写资料见 [归档](handoff/README.md)。迁入不等于迁入后重新验收，更不能将原有 Go2 的实机/运动验收视为 Go2W 验收。
 
 - **已在 Go2W 真机只读验证：** 专用以太网 `enp131s0` 连通；笔记本上的 Unitree SDK2/DDS 收到 `rt/lowstate`（LowState）及 `rt/lf/sportmodestate`（SportModeState）。候选 LiDAR topic `rt/utlidar/cloud` 在一次 10 秒订阅中为 0 帧；这不证明机器人没有 LiDAR 数据。
-- **仅本地实验链路验证、尚未同步功能代码：** 一次 SDK2 相机取图成功；独立 Go2W camera snapshot 原型在本机注册 Atlas，并经回环 MCP 调用返回单帧 RGB。其源时间、optical frame 和标定未验证；这不是本仓库完整相机部署验收。
-- **本仓库 Go2W 部署仍待完成：** 真实状态/IMU/odometry/TF provider、LiDAR 来源与 QoS、可复现的 camera/provider/Atlas 部署、Pilot/Executor 端到端调用及任何 motion 验证。health 当前仅有 mock 原型；Go2W 运动始终保持禁用，未经单独批准不得执行。
+- **仅原位置本地实验链路验证、迁入后未重测：** 一次 SDK2 相机取图成功；独立 Go2W camera snapshot 原型在本机注册 Atlas，并经回环 MCP 调用返回单帧 RGB。其源时间、optical frame 和标定未验证；这不是完整相机部署验收。
+- **Go2W 部署仍待完成：** 真实状态/IMU/odometry/TF provider、LiDAR 来源与 QoS、迁入后可复现的 camera/provider/Atlas 验证、Pilot/Executor 端到端调用及任何 motion 验证。health 当前仅有 mock 原型；Go2W 运动始终保持禁用，未经单独批准不得执行。
 
 证据等级、历史记录和后续缺口见 [Go2W 文档索引](docs/go2w/README.md)。下文描述的是继承自官方 Go2 仓库的能力和验收，**未经 Go2W 真机验证**，不可直接套用。
 

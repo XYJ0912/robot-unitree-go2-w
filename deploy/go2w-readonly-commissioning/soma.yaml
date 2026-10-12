@@ -1,0 +1,34 @@
+urdf:
+  path: ./urdf/commissioning_only.urdf
+  root_link: base_link
+  model_name: go2w_commissioning_only
+
+robot:
+  id: unitree_go2w_commissioning
+  display_name: Go2W read-only commissioning (not a real body model)
+  family: wheel_legged_robot
+  root_part: base
+  components:
+    - id: base
+      type: mobile_base
+      urdf_link: base_link
+      exports:
+        - provider_id: go2w_health_mock
+          capabilities:
+            - path: robonix/primitive/health/state
+              description: Mock-only integration check; not Go2W telemetry.
+            - path: robonix/primitive/health/stream
+              description: Mock-only integration check; not Go2W telemetry.
+      components:
+        - id: camera_unlocalized
+          type: rgb_camera
+          exports:
+            - provider_id: go2w_camera_snapshot
+              capabilities:
+                - path: robonix/primitive/camera/snapshot
+                  description: Real on-demand RGB sample; source timestamp and optical frame unknown.
+
+description:
+  summary: Commissioning fixture with real read-only camera snapshot; not a verified Go2W model.
+  can_do: ["Read one real camera image", "Check mock health provider registration"]
+  cannot_do: ["Represent Go2W geometry", "Report real health", "Move"]
