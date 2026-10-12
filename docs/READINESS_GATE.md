@@ -1,5 +1,9 @@
 # Real full-stack readiness gate
 
+This script and its PASS criteria are for the inherited **Go2** stack. They
+do not qualify the current Go2W commissioning profile for motion or
+autonomous navigation. See [Go2W completion criteria](go2w/AUTONOMOUS_NAVIGATION_TARGET.md).
+
 `scripts/check_stack_readiness.sh` is the final read-only check between
 `rbnx boot` and any later, separately approved physical-motion gate. Robonix
 boot is intentionally best-effort for non-core packages, so seeing its

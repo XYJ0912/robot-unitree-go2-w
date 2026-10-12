@@ -1,5 +1,13 @@
 # Go2W read-only deployment preparation
 
+This profile is an **intermediate read-only commissioning fixture**, not the
+project's completion target. Completion means a Pilot-issued, verified goal is
+executed through Robonix navigation and Nav2 on this Go2W, with live
+localization/obstacle sensing, guarded exclusive chassis control, real
+feedback, and safe stop on completion, cancel and faults. See
+[the Go2W autonomous-navigation acceptance target](../../docs/go2w/AUTONOMOUS_NAVIGATION_TARGET.md).
+Do not repurpose this mock-health, one-link-URDF profile as a motion profile.
+
 This directory is an isolated Go2W commissioning profile inside the Go2W
 repository. It is separate from the Robonix monorepo and the inherited Go2
 production profiles. The original handoff copy remains in
@@ -34,7 +42,7 @@ deliberately do not claim a validated frame or unit.
 were seen, 2 means one or both were absent.
 The camera probe sends one SDK image-read request, prints only size/return
 code/JPEG markers, and saves no image. It does not validate camera calibration
-or authorize publishing an RGB capability.
+or authorize using this image for localization or obstacle avoidance.
 
 The SDK2 Go2W example confirms `rt/lf/sportmodestate` but also calls motion
 APIs; do not run that example on a shared robot. Before registering standard

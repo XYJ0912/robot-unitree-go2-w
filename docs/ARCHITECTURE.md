@@ -1,5 +1,10 @@
 # Architecture
 
+This page describes the inherited **Go2** implementation and its verified
+reference deployment. It is not an implemented or accepted Go2W command path.
+For the Go2W Pilot→Nav2→robot target and current gaps, see
+[Go2W autonomous-navigation target](go2w/AUTONOMOUS_NAVIGATION_TARGET.md).
+
 ## Command path
 
 ```text

@@ -1,5 +1,10 @@
 # Deployment
 
+This runbook is for the inherited **Go2** deployment. It is not a Go2W
+autonomous-navigation install or startup procedure; follow the
+[Go2W target and prerequisite gates](go2w/AUTONOMOUS_NAVIGATION_TARGET.md)
+before adapting any of its commands.
+
 ## Prerequisites
 
 - Ubuntu 22.04 x86_64 and ROS 2 Humble.

@@ -1,5 +1,10 @@
 # Acceptance matrix
 
+This matrix belongs to the inherited **Go2** reference deployment; no row is
+automatically a Go2W pass. The Go2W completion standard includes supervised
+Pilot-issued autonomous navigation, feedback and safe stopping, as specified
+in [the Go2W target](go2w/AUTONOMOUS_NAVIGATION_TARGET.md).
+
 | Layer | Pass condition | Evidence |
 |---|---|---|
 | Chinese ASR | Exact spoken phrase transcribes as “走到前面自动售货机那里” or a harmless punctuation variant | Liaison/ASR event log |

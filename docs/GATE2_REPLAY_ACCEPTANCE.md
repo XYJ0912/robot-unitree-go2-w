@@ -1,5 +1,9 @@
 # Gate 2 isolated rosbag replay acceptance
 
+This harness targets the inherited **Go2** topics, frames and map. A Go2
+replay PASS is not a Go2W pass; Go2W needs its own measured capture, map and
+acceptance against [the Go2W autonomous-navigation target](go2w/AUTONOMOUS_NAVIGATION_TARGET.md).
+
 This gate validates the ROS navigation stack before it is allowed to share a
 graph with a physical Go2. It is a replay test, not a motion test. The runner
 does not select a physical interface, import Unitree SDK2, start a chassis

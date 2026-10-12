@@ -1,5 +1,11 @@
 # Safety gates
 
+These gates and the physical Go2 acceptance below apply to the inherited
+**Go2** deployment, not to Go2W. Do not set the Go2 motion variables or run
+its movement procedures on Go2W. The separate Go2W autonomous-navigation
+target and prerequisite safety work are documented
+[here](go2w/AUTONOMOUS_NAVIGATION_TARGET.md); Go2W motion remains disabled.
+
 The gates are cumulative. Passing one never bypasses another.
 
 All non-DDS control, capability, reverse-audio and dashboard endpoints are

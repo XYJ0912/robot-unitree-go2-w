@@ -1,5 +1,10 @@
 # Operator hardware checklist
 
+This checklist records the inherited **Go2** hardware and site. Its firmware
+values, geometry, motion preparation and prior evidence do not apply to
+Go2W. Use [the Go2W target and current gaps](go2w/AUTONOMOUS_NAVIGATION_TARGET.md)
+before planning Go2W autonomous navigation or any movement.
+
 These are the only steps that require physical access or privileged input.
 
 ## 1. Cable and NIC identification
