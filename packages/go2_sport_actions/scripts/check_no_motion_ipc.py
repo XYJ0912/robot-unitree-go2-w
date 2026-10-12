@@ -3,7 +3,7 @@
 
 import sys
 
-from go2_sport_actions.ipc import ARM, DaemonClient, DaemonError
+from runtime_service.go2_sport_runtime.ipc import ARM, DaemonClient, DaemonError
 
 
 def main():

@@ -1,7 +1,7 @@
 manifestVersion: 1
 package:
   name: robonix.skill.unitree.go2.sport_actions
-  version: 0.2.0
+  version: 0.3.0
   description: "宇树 Go2 EDU 先卧倒，再自行站起；不是保持卧倒。"
   license: Apache-2.0
   tags: [skill, unitree, go2, sport, actions]

@@ -1,9 +1,0 @@
-[contract]
-id = "robonix/skill/go2_sport_actions/execute"
-version = "1"
-kind = "skill"
-idl = "go2_sport_actions/srv/ExecuteAction.srv"
-[mode]
-type = "rpc"
-[semantics]
-user_invocable = false

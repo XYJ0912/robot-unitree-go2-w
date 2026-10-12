@@ -1,15 +1,21 @@
 # 宇树 Go2 动作技能包 · Robonix
 
 **一个 package，7 个独立注册的 Skill，复用 8 项已实机验收的底层动作。**
-包名保持 `robonix.skill.unitree.go2.sport_actions`，版本 **0.2.0**。
+包名保持 `robonix.skill.unitree.go2.sport_actions`，版本 **0.3.0**。
 网站保留同一个包入口，不拆成七个代码仓库。
 
-网站使用 `package_manifest.catalog.yaml` 索引七项公开技能，每项列出
+主清单 `package_manifest.yaml` 只声明七项公开技能，每项列出
 driver（生命周期）、execute（执行）、status（状态）和 cancel（取消）四类接口。
-`package_manifest.yaml` 仍是生成绑定所需的完整清单，含共享后台 Service
-及旧版 `go2_sport_actions` 兼容接口；这些不是额外的公开动作技能。
-目录索引文件只供网站使用，实际部署使用下文的七实例配置及各动作 manifest。
-本次目录整理不修改动作代码、SDK 命令、时序或语音部署。
+因此是 **1 个 Skill 软件包、7 个技能、28 个接口**。
+
+共享执行器已拆成同一仓库内独立的 Service 包
+[`runtime_service/`](runtime_service/README.md)，有自己的清单、构建和启动入口，
+只注册 Service 合约，不计入技能数。旧的 `robonix/skill/go2_sport_actions`
+通用入口已移除。网站旧的 `package_manifest.catalog.yaml` 暂时保留为与主清单
+完全一致的过渡别名，待 catalog 切回主清单后再删除，避免发布期间断链。
+
+`capabilities/consumed/` 只提供调用后台服务所需的客户端代码生成定义，
+不在 Skill 的公开能力清单中；实际 Service 由独立包注册。
 
 ## 七个技能
 
@@ -48,7 +54,7 @@ Client 语音 → Speech → Pilot 选择具名 Skill → Executor →
 Dance1/2 监督窗口仍为 45/55 秒，倒立保持 8+4 秒，
 倒立前进仍为 0.06 m/s × 5 秒，结束后恢复四足。
 SDK daemon、动作 ID 和这些运动计划没有变更。
-**0.2.0 注册/随机选择链路的验证为离线验证，不宣称重新完成真机验收。**
+**0.2.0 注册/随机选择及 0.3.0 拆包链路均为离线验证，不宣称重新完成真机验收。**
 其他 Go2 或固件仍需验证兼容性；不包含鞠躬、前跳、后空翻。
 
 ## 下载与构建
@@ -62,8 +68,10 @@ git clone https://github.com/syswonder/skill-unitree-go2-sport-actions-rbnx.git
 export GO2_ROBOT_DIR="$(realpath robot-unitree-go2)"
 export GO2_SKILL_DIR="$(realpath skill-unitree-go2-sport-actions-rbnx)"
 bash "$GO2_SKILL_DIR/scripts/build_daemon.sh"
-rbnx validate "$GO2_SKILL_DIR"
-rbnx build "$GO2_SKILL_DIR"
+# 主清单的多 Driver 启动支持仍待上游 #276，直接调用包内构建脚本：
+bash "$GO2_SKILL_DIR/build.sh"
+rbnx validate "$GO2_SKILL_DIR/runtime_service"
+rbnx build "$GO2_SKILL_DIR/runtime_service"
 ```
 
 也可直接用 robot 仓库内的 `packages/go2_sport_actions`。
@@ -75,7 +83,8 @@ rbnx build "$GO2_SKILL_DIR"
 
 完整配置见 [seven-skills.yaml](examples/seven-skills.yaml)，包含
 1 个共享服务和 7 个独立 `skill:` 条目，每项都引用相同 `GO2_SKILL_DIR`，
-但选择自己的 manifest 和 action 初始化参数。例如：
+但选择自己的 manifest 和 action 初始化参数；服务条目的 path 则指向
+`${GO2_SKILL_DIR}/runtime_service`，不再使用旧的 runtime manifest。例如：
 
 ```yaml
 skill:
@@ -89,7 +98,10 @@ skill:
 
 不要只复制这一项而遗漏共享服务。完整配置已列齐七项，无需复制源码。
 `go2_sport_actions/skills.json` 汇总七个身份、中文说明、SDK 对应关系及初始化参数。
-manifest 变体只限定各实例的公开接口，实际启动和运行逻辑复用同一份实现。
+各动作 manifest 暂时作为现有启动器的实例选择入口保留。
+[上游 robonix#276](https://github.com/syswonder/robonix/issues/276)
+落地后才迁移为单条配置的 `enable` / `RBNX_PROVIDES`；目前不要提前使用这些字段。
+七个 Skill 的身份、初始化参数和模型可见接口均未改变。
 
 将配置的 service/skill 条目加入已有 Client 部署，并保留该本体的 Soma 配置。
 `examples/offline-soma.yaml` 和 `offline.urdf` 仅为独立注册测试夹具，不是 Go2 物理模型。
@@ -141,7 +153,7 @@ FAILED/CANCELLED 时停止后续序列；实际停止仍需现场确认。
 ```bash
 cd "$GO2_SKILL_DIR"
 PYTHONPATH=. python3 -m unittest discover -s tests -q
-rbnx validate .
+# 目前的 rbnx 尚不支持多 Driver 主清单验证；使用各动作 manifest 部署。
 # 该配置 backend=catalog，不连接机器人、不启动 SDK daemon：
 rbnx boot -f examples/offline-seven-skills.yaml
 ```
@@ -149,13 +161,14 @@ rbnx boot -f examples/offline-seven-skills.yaml
 启动后 Atlas 应注册 7 个 KIND_SKILL 和 1 个共享动作 Service。
 `scripts/check_registration.py` 只查询注册信息，不发动作；
 生成绑定后可运行 `scripts/check_split_provider_offline.py` 检查七个初始化/调用适配。
-原 `scripts/check_provider_offline.py` 检查兼容接口。
+`scripts/check_provider_offline.py` 在 loopback 上启动禁用运动的服务夹具，
+用七个真实 Skill 客户端检查 21 次 gRPC 调用，分别使用两包独立生成的绑定。
 全仓 `scripts/validate_offline.sh` 继续验证旧导航/跟随与底盘协议。
 
 ## 兼容与许可
 
-0.1.0 通用接口保留给原部署的程序兼容，默认七技能部署不会注册它，
-其 user_invocable 标记已关闭，不向模型重复暴露两个舞蹈编号。
+0.3.0 删除 0.1.0 通用 Skill 合约和对应启动入口。旧部署请按七技能示例迁移；
+需要复查原始演示时可使用仓库历史版本。动作说明、SDK ID、参数和运动计划未改变。
 历史验收文档保留原样，不把八项旧验收改写为七项新链路实测。
 
 Apache-2.0；Unitree SDK2 与固件由上游提供，遵守各自许可。

@@ -8,7 +8,10 @@ split after its source PR passes checks and is merged. Do not copy generated
 bindings, SDK binaries, model weights, logs or credentials.
 
 Run `PYTHONPATH=. python3 -m unittest discover -s tests -q`,
-`rbnx validate .`, and the parent robot's offline validation for daemon changes.
+`bash build.sh`, `bash runtime_service/build.sh`, and the parent robot's offline
+validation for daemon changes. Until robonix#276 lands, the current rbnx validator
+rejects the multi-Driver root manifest; deployment uses the per-action manifests.
+Validate the separate runtime package with `rbnx validate runtime_service`.
 Default execution must remain motion-disabled. Preserve runtime stop/cancel,
 command timeout, fresh state and single-controller behavior. Report physical
 evidence separately from offline tests.
