@@ -1,7 +1,7 @@
 manifestVersion: 1
 package:
   name: robonix.skill.unitree.go2.sport_actions
-  version: 0.2.0
+  version: 0.3.0
   description: "宇树 Go2 EDU 伸展身体/伸懒腰，执行一次后自然收尾。"
   license: Apache-2.0
   tags: [skill, unitree, go2, sport, actions]

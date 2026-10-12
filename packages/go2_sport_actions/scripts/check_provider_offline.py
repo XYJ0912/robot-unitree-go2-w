@@ -1,42 +1,70 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Import generated Robonix bindings and exercise non-motion Skill endpoints."""
-
+"""Loopback gRPC test: separate generated Skill/service bindings, no SDK or Atlas."""
+import asyncio
 import json
 import os
+from pathlib import Path
+import select
+import subprocess
+import sys
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from go2_sport_actions.provider import (
-    activate, execute_utterance, init, list_actions, preview,
-)
+from go2_sport_actions.action_provider import ActionSkill
+from go2_sport_actions.skills import DEFINITIONS
 from go2_sport_actions_mcp import (
-    ExecuteUtterance_Request, ListActions_Request, PreviewAction_Request,
+    PerformAction_Request, GetActionStatus_Request, CancelAction_Request,
 )
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+async def check(endpoint):
+    channels = []
+    def connect(**kwargs):
+        assert kwargs["provider_id"] == "unitree_go2_sport_runtime"
+        assert kwargs["transport"] == "grpc"
+        channel = SimpleNamespace(endpoint=endpoint, closed=False)
+        def close():
+            channel.closed = True
+        channel.close = close
+        channels.append(channel)
+        return channel
+    with patch("go2_sport_actions.action_provider.ATLAS.connect_capability", side_effect=connect):
+        for definition in DEFINITIONS:
+            wrapper = ActionSkill(definition["action"])
+            wrapper.init(definition["init"])
+            assert wrapper.initialized and len(wrapper.skill._mcp_handlers) == 3
+            reply = await wrapper.execute(PerformAction_Request(request_id=definition["action"]))
+            assert not reply.accepted
+            assert json.loads(reply.message)["reason"] == "physical_backend_not_configured", reply.message
+            status = await wrapper.status(GetActionStatus_Request(run_id="unknown"))
+            assert not json.loads(status.result_json)["known"]
+            cancel = await wrapper.cancel(CancelAction_Request(run_id="unknown"))
+            assert not cancel.ok
+        assert len(channels) == 21 and all(c.closed for c in channels)
 
 
 def main():
-    init({})
-    activate()
-    listing = json.loads(list_actions(ListActions_Request()).catalog_json)
-    assert listing["daemon_socket_configured"] is False
-    assert all(item["name"] != "bow" for item in listing["actions"])
-    bow = json.loads(preview(PreviewAction_Request(name="bow")).result_json)
-    assert not bow["known"] and not bow["physical_plan_prepared"]
-    result = execute_utterance(ExecuteUtterance_Request(text="请跳舞", request_id="offline"))
-    assert result.action_name == "dance" and not result.accepted
-    assert json.loads(result.message)["reason"] == "physical_backend_not_configured"
-    negated = execute_utterance(ExecuteUtterance_Request(text="不要跳舞", request_id="offline-2"))
-    assert not negated.accepted and not negated.action_name
-    cancelled = execute_utterance(ExecuteUtterance_Request(text="停止动作", request_id="offline-3"))
-    assert not cancelled.accepted and cancelled.action_name == "cancel"
-    # A managed package stays read-only without the existing runtime operator
-    # acknowledgement; this check never starts SDK2 or sends an action.
-    with patch.dict(os.environ, {"GO2_OPERATOR_PRESENT": "",
-                                 "GO2_STAGED_NAV2_RUNTIME_ACK": ""}):
-        init({"backend": "managed", "daemon_socket": "/nonexistent/sport.sock",
-              "network_interface": "not-a-robot", "daemon_binary": "/nonexistent/daemon"})
-        denied = execute_utterance(ExecuteUtterance_Request(text="请跳舞", request_id="offline-4"))
-        assert not denied.accepted and "acknowledgement" in denied.message
-    print("provider offline smoke: PASS; no daemon connection or motion")
+    runtime = ROOT / "runtime_service"
+    env = dict(os.environ)
+    api = subprocess.check_output(
+        [env.get("RBNX_BIN", "rbnx"), "path", "robonix-api"], text=True).strip()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [api, str(runtime), str(runtime / "rbnx-build/codegen/proto_gen")])
+    process = subprocess.Popen(
+        [sys.executable, "-u", str(runtime / "scripts/offline_server.py")],
+        env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
+    try:
+        ready, _, _ = select.select([process.stdout], [], [], 15)
+        assert ready, "offline service did not become ready"
+        endpoint = process.stdout.readline().strip()
+        assert endpoint.startswith("127.0.0.1:"), endpoint
+        asyncio.run(check(endpoint))
+    finally:
+        process.communicate("", timeout=10)
+    assert process.returncode == 0
+    print("PASS: seven Skill clients -> separate service gRPC, 21 calls, zero robot motion")
 
 
 if __name__ == "__main__":

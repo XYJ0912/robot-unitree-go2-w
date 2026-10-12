@@ -8,5 +8,5 @@ crouch、dance、handstand、handstand_walk。舞蹈由共享服务随机选择�
 所有动作仅适用于兼容的宇树 Go2 EDU，不是跨本体动作或 MuJoCo 策略。
 七个 Skill 共用一个 Service 和底盘所有者，后者不是另一个用户动作技能。
 
-0.1.0 的通用接口仅作旧部署兼容，不向模型公开。接受不代表物理完成；
+0.3.0 已移除旧通用接口，后台 Service 位于独立的 runtime_service 包。接受不代表物理完成；
 完成状态、实际姿态确认、停止与取消规则见 README.md。

@@ -6,7 +6,7 @@
 
 ## 准备
 
-1. 按 [技能包 README](../../packages/go2_sport_actions/README.md) 构建 daemon 和技能包。
+1. 按 [技能包 README](../../packages/go2_sport_actions/README.md) 构建 daemon、技能包及独立的 runtime_service 服务包。
 2. 设置 `ROBONIX_DEPLOY_DIR`、`ROBONIX_SOURCE_PATH`、
    `ROBONIX_AUDIO_BRIDGE_PATH`、`ROBONIX_SPEECH_PATH`、
    `FUNASR_MODEL_DIR` 为已有环境的路径。
@@ -38,5 +38,6 @@
 
 2026-09-28 前的 8 项底层动作已经现场验收。
 0.2.0 的七实例注册、MCP 调用、随机选择与去重在离线环境验证；
+0.3.0 将共享执行器移入独立服务包，保留七实例配置，并通过离线跨包 gRPC 检查。
 没有因注册改造而重跑物理动作或变更固件动作参数。
 如需恢复导航/跟随，先关闭本专用动作部署，避免共同占用底盘。

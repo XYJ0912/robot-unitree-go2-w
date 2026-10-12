@@ -9,8 +9,7 @@ system:
   soma: {listen: '127.0.0.1:50091', robot_yaml: offline-soma.yaml, log: info}
 service:
   - name: unitree_go2_sport_runtime
-    path: ${GO2_SKILL_DIR}
-    manifest: package_manifest.runtime.yaml
+    path: ${GO2_SKILL_DIR}/runtime_service
     config:
       backend: managed
       daemon_socket: ${GO2_SDK_SOCKET}

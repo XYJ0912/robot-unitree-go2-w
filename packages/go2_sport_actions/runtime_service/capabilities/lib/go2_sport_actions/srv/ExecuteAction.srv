@@ -1,7 +1,6 @@
-string text
+string name
 string request_id
 ---
 bool accepted
 string run_id
-string action_name
 string message

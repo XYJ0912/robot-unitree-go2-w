@@ -1,14 +1,15 @@
-# SPDX-License-Identifier: Apache-2.0
-# Public catalog index only. Deploy with the per-action manifests in
-# examples/seven-skills.yaml; package_manifest.yaml remains the build superset.
+# Transitional alias while catalog PR switches back to package_manifest.yaml.
+# Same public capabilities and package metadata; remove after that PR merges.
 manifestVersion: 1
 package:
   name: robonix.skill.unitree.go2.sport_actions
-  version: 0.2.0
+  version: 0.3.0
   description: Seven independently registered Unitree Go2 action skills in one package, with randomized dancing and a shared runtime reusing eight physically validated routines.
   license: Apache-2.0
   tags: [skill, unitree, go2, sport, actions]
   maintainers: [Origamii520 <zxq13204030517@163.com>]
+build: bash build.sh
+start: bash start.sh
 capabilities:
   - name: robonix/skill/unitree_go2_hello/driver
     path: capabilities/hello_driver.v1.toml

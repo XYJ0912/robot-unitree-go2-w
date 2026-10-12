@@ -4,12 +4,12 @@ import threading
 import time
 import unittest
 
-from go2_sport_actions.ipc import (
+from runtime_service.go2_sport_runtime.ipc import (
     ARM, DISARM, MOVE, PING, SPORT_ACTION, STOP, COMMAND, REPLY, MAGIC, VERSION,
     DaemonError, make_command, parse_reply,
 )
-from go2_sport_actions.runtime import ActionManager, PLANS, Run, Step
-from go2_sport_actions.daemon_owner import ManagedDaemon, MOTION_ACK, PROFILE
+from runtime_service.go2_sport_runtime.runtime import ActionManager, PLANS, Run, Step
+from runtime_service.go2_sport_runtime.daemon_owner import ManagedDaemon, MOTION_ACK, PROFILE
 from go2_sport_actions.voice import action_from_utterance, is_cancel_utterance
 
 

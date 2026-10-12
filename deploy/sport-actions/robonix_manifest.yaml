@@ -35,8 +35,7 @@ primitive:
 
 service:
   - name: unitree_go2_sport_runtime
-    path: ${ROBONIX_DEPLOY_DIR}/packages/go2_sport_actions
-    manifest: package_manifest.runtime.yaml
+    path: ${ROBONIX_DEPLOY_DIR}/packages/go2_sport_actions/runtime_service
     config:
       backend: managed
       daemon_socket: ${GO2_SDK_SOCKET}

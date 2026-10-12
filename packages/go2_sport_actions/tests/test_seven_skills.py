@@ -5,7 +5,7 @@ import threading
 import unittest
 from unittest.mock import Mock
 
-from go2_sport_actions.runtime import ActionManager, PLANS
+from runtime_service.go2_sport_runtime.runtime import ActionManager, PLANS
 from go2_sport_actions.skills import BY_ACTION, DEFINITIONS
 import test_runtime as fixtures
 FakeDaemon = fixtures.FakeDaemon

@@ -4,8 +4,8 @@ import json
 from pathlib import Path
 import unittest
 
-from go2_sport_actions.catalog import ACTIONS, catalog, dumps, preview
-from go2_sport_actions.runtime import ActionManager
+from runtime_service.go2_sport_runtime.catalog import ACTIONS, catalog, dumps, preview
+from runtime_service.go2_sport_runtime.runtime import ActionManager
 
 
 class CatalogTests(unittest.TestCase):
@@ -66,7 +66,7 @@ class CatalogTests(unittest.TestCase):
         self.assertEqual(len(ACTIONS), len({a.name for a in ACTIONS}))
 
     def test_catalog_has_no_sdk_or_network_imports(self):
-        source = Path(__file__).resolve().parents[1] / "go2_sport_actions/catalog.py"
+        source = Path(__file__).resolve().parents[1] / "runtime_service/go2_sport_runtime/catalog.py"
         tree = ast.parse(source.read_text())
         imports = set()
         for node in ast.walk(tree):
